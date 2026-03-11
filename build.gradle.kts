@@ -1,5 +1,6 @@
 plugins {
     id("java")
+    id("com.gradleup.shadow") version "9.3.2"
     id("org.graalvm.buildtools.native") version "0.11.1"
 }
 
@@ -7,6 +8,9 @@ group = "top.monkeyfans.vector"
 version = "1.0-SNAPSHOT"
 
 java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(25))
+    }
     targetCompatibility = JavaVersion.VERSION_25
     sourceCompatibility = JavaVersion.VERSION_25
 }
@@ -21,17 +25,23 @@ tasks.compileJava {
     options.release = 25
 }
 graalvmNative {
+    metadataRepository{
+        enabled.set(true)
+    }
     binaries.all {
         buildArgs.add("--exact-reachability-metadata")
         runtimeArgs.add("-XX:MissingRegistrationReportingMode=Warn")
     }
     binaries {
         named("main") {
-            imageName.set("koala")
+            imageName.set("koala-vector")
             mainClass.set("top.monkeyfans.vector.KoalaVector")
             buildArgs.add("-O3")
+//            buildArgs.add("--gc=G1")
             buildArgs.add("--no-fallback")
-            buildArgs.add("--initialize-at-build-time")
+            buildArgs.add("--static")
+            buildArgs.add("--libc=musl")
+            buildArgs.add("--initialize-at-run-time=ch.qos.logback,org.slf4j")
             buildArgs.add("--enable-url-protocols=http")
             jvmArgs.add("-Dundertow.options.server.ALLOW_ENCODED_SLASH=true")
         }

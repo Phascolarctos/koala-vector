@@ -1,0 +1,12 @@
+{
+  "resources": {
+    "includes": [
+      {"pattern": "ch/qos/logback/.*"},
+      {"pattern": "org/slf4j/.*"},
+      {"pattern": "META-INF/services/.*"},
+      {"pattern": "logback.xml"},
+      {"pattern": "logback-test.xml"},
+      {"pattern": ".*\\.properties$"}
+    ]
+  }
+}

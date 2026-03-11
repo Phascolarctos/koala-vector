@@ -11,7 +11,7 @@ public class KoalaVector {
     public static void main(String[] args) {
         LOGGER.info("Starting KoalaVector");
         Undertow undertow = Undertow.builder()
-                .addHttpListener(8080, "localhost")
+                .addHttpListener(8080, "0.0.0.0")
                 .setHandler(exchange -> {
                     exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
                     exchange.getResponseSender().send("Hello World");

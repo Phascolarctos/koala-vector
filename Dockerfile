@@ -1,28 +1,46 @@
-FROM gradle:9.4.0-jdk25 AS build
+FROM eclipse-temurin:25-alpine-3.23 AS builder
 
-WORKDIR /app
+WORKDIR /build
 
+COPY gradle ./gradle
+COPY gradlew .
 COPY build.gradle.kts settings.gradle.kts ./
+RUN chmod u+x ./gradlew
 
 COPY src ./src
+RUN --mount=type=cache,target=/root/.gradle \
+    ./gradlew shadowJar --no-daemon
 
-RUN gradle clean build --no-daemon
+FROM eclipse-temurin:25-alpine-3.23 AS jre-builder
+WORKDIR /jre-gen
 
-FROM ghcr.io/graalvm/native-image-community:25-muslib as native
+RUN $JAVA_HOME/bin/jlink \
+    --add-modules java.base,java.desktop,java.management,java.naming,java.security.jgss,java.security.sasl,java.sql,jdk.unsupported \
+    --strip-debug \
+    --no-man-pages \
+    --no-header-files \
+    --compress=2 \
+    --output /runtime
 
-WORKDIR /native
+FROM alpine:3.23
+LABEL maintainer="koala-vector"
 
-COPY --from=build /app/build/libs/*.jar App.jar
+# 设置环境变量
+ENV JAVA_HOME=/opt/java/openjdk
+ENV PATH="$JAVA_HOME/bin:$PATH"
 
-RUN native-image -Ob --no-fallback --initialize-at-build-time --enable-url-protocols=http -jar App.jar koala-vector
+# 从前两个阶段拷贝产物
+COPY --from=jre-builder /runtime $JAVA_HOME
+WORKDIR /app
 
-FROM scratch
+COPY --from=builder /build/build/libs/*-all.jar app.jar
 
-WORKDIR /opt/app
-
-# Copy the native executable
-COPY --from=native /native/koala-vector koala-vector
+RUN apk add --no-cache gcompat
 
 EXPOSE 8080
 
-ENTRYPOINT ["./koala-vector"]
+ENTRYPOINT ["java", \
+            "-XX:+UseContainerSupport", \
+            "-XX:MaxRAMPercentage=75.0", \
+            "-Dfile.encoding=UTF-8", \
+            "-jar", "app.jar"]
