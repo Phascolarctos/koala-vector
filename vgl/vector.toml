@@ -1,0 +1,52 @@
+[sources.app_logs]
+type = "file"
+include = ["/app/logs/koala-service/*.log"]
+
+[transforms.parse_json]
+type = "remap"
+inputs = ["app_logs"]
+source = """
+# 1. 预设默认标签，防止后续渲染 {{level}} 失败
+.level = .level || "UNKNOWN"
+.class = .class || "UNDEFINED"
+
+# 2. 解析 JSON
+structured, err = parse_json(.message)
+
+if err == null && is_object(structured) {
+    # 合并字段
+    . = merge!(., structured)
+
+    # 移除原始 message 字符串，节省存储空间
+    del(.message)
+
+    # 清洗：移除空异常
+    if .exception == "" {
+        del(.exception)
+    }
+
+    # 2026 规范：如果 JSON 里有 @timestamp，将其统一为 Vector 标准格式
+    if exists(."@timestamp") {
+        .timestamp = parse_timestamp!(."@timestamp", format: "%+")
+        del(."@timestamp")
+    }
+} else {
+    # 如果解析失败，保留原始消息，并打上报错标签方便在 Grafana 里搜
+    .level = "ERROR"
+    .parse_error = true
+}
+"""
+
+[sinks.loki_out]
+type = "loki"
+inputs = ["parse_json"]
+endpoint = "http://loki:3100"
+encoding.codec = "json"
+
+# 标签（Labels）：只放查询频率极高的字段
+labels.level = "{{level}}"
+labels.class = "{{class}}"
+
+# 2026 推荐：将其他所有字段作为 Structured Metadata 发送
+# 这会让你的 Loki 查询速度极快且索引极小
+remove_label_fields = true

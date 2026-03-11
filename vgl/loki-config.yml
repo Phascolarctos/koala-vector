@@ -1,0 +1,71 @@
+auth_enabled: false
+
+server:
+  http_listen_address: 0.0.0.0  # 👈 显式允许外部访问
+  http_listen_port: 3100
+  grpc_listen_address: 0.0.0.0  # 👈 显式允许外部访问
+  grpc_listen_port: 9095
+  http_server_read_timeout: 600s
+  http_server_write_timeout: 600s
+
+common:
+  instance_addr: 0.0.0.0        # 👈 改为 0.0.0.0 或直接删掉这一行
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+storage_config:
+  tsdb_shipper:
+    active_index_directory: /loki/tsdb-index
+    cache_location: /loki/tsdb-cache
+    shared_store: filesystem
+    index_gateway_client:
+      # 👈 这里必须指向容器名或 0.0.0.0
+      server_address: dns:///loki:9095
+
+limits_config:
+  # 允许 Vector 传过来的结构化元数据，这是 2026 年高性能的关键
+  allow_structured_metadata: true
+  # 自动创建索引
+  allow_label_name_case_insensitive: true
+  # 限制：每秒最大写入速率 (根据你的服务器吞吐调整)
+  ingestion_rate_mb: 20
+  ingestion_burst_size_mb: 30
+  # 保留策略：生产环境建议 15-30 天
+  retention_period: 720h
+
+schema_config:
+  configs:
+    - from: "2024-01-01"
+      store: tsdb
+      object_store: filesystem
+      schema: v13             # 2026 年标准 Schema 版本
+      index:
+        prefix: index_
+        period: 24h
+
+# 2026 自动化运维：强化的压缩与清理器
+compactor:
+  working_directory: /loki/compactor
+  shared_store: filesystem
+  compaction_interval: 10m
+  retention_enabled: true     # 物理删除开关
+  retention_delete_delay: 2h
+  # 2026 特有：基于磁盘水位的自动清理预警
+  delete_request_cancel_period: 24h
+
+# 查询加速层
+query_range:
+  parallelise_shardable_queries: true
+  cache_results: true
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 256     # 2026 年内存充足建议给到 256MB+

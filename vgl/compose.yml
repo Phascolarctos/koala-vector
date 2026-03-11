@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  koala-vector:
+    image: localhost/koala:latest
+    pull_policy: always
+    user: :root
+    volumes:
+      - koala-logs:/app/logs:rw
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    environment:
+      - TZ=Asia/Shanghai
+    ports:
+      - "8080:8080"
+  vector:
+    image: timberio/vector:0.54.0-debian
+    user: root
+    volumes:
+      - ./vector.toml:/etc/vector/vector.toml:ro
+      - koala-logs:/app/logs:ro
+    command: --config /etc/vector/vector.toml
+    depends_on:
+      - koala-vector
+  # 2. Loki: 存储日志
+  loki:
+    image: grafana/loki:3.6.0
+    user: root
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yml
+      - loki-data:/loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    depends_on:
+      - vector
+  # 3. Grafana: 可视化界面
+  grafana:
+    image: grafana/grafana:12.4.1
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    depends_on:
+      - loki
+volumes:
+  koala-logs:
+    external: true
+  loki-data:
+    external: true
