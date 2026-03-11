@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 public class KoalaVector {
     private static final Logger LOGGER = LoggerFactory.getLogger(KoalaVector.class);
 
-    static void main() {
+    public static void main(String[] args) {
         LOGGER.info("Starting KoalaVector");
         Undertow undertow = Undertow.builder()
                 .addHttpListener(8080, "localhost")
